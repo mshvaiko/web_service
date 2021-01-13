@@ -2,22 +2,21 @@
 
 #include <string>
 
-namespace server
-{
-    
-class web_server
-{
+namespace server {
+
+class web_server {
 private:
-    std::string address;
-    int port;
-    int sock_fd;
+  std::string address;
+  int port;
+  int sock_fd;
+
 public:
-    web_server(const std::string& address_, int port_);
-    ~web_server() = default;
+  web_server(const std::string &address_, int port_);
+  ~web_server() = default;
 
-    bool init();
+  bool init();
 
-    void run();
+  void run();
 };
 
 } // namespace server
