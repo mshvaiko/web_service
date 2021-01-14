@@ -1,5 +1,6 @@
 #include "thread_pool.h"
 
+#include <iostream>
 #include <memory>
 
 namespace server {
@@ -9,31 +10,23 @@ thread_pool::thread_pool(size_t pool_size) : stop_(false) {
     workers_.emplace_back([this] {
       for (;;) {
         std::function<void()> task;
-
         {
           std::unique_lock<std::mutex> lock(this->queue_mutex_);
           this->condition_.wait(
               lock, [this] { return this->stop_ || !this->tasks_.empty(); });
+
           if (this->stop_ && this->tasks_.empty())
             return;
+
           task = std::move(this->tasks_.front());
           this->tasks_.pop();
         }
-
         task();
       }
     });
 }
 
-template <typename F, typename... Args>
-auto thread_pool::enqueue(F &&f, Args &&... args)
-    -> std::future<typename std::result_of<F(Args...)>::type> {
-  using return_type = typename std::result_of<F(Args...)>::type;
-
-  auto task = std::make_shared<std::packaged_task<return_type()>>(
-      std::bind(std::forward<F>(f), std::forward<Args>(args)...));
-
-  std::future<return_type> res = task->get_future();
+void thread_pool::enqueue(std::function<void()> task) {
   {
     std::unique_lock<std::mutex> lock(queue_mutex_);
 
@@ -41,10 +34,9 @@ auto thread_pool::enqueue(F &&f, Args &&... args)
     if (stop_)
       throw std::runtime_error("enqueue on stopped ThreadPool");
 
-    tasks_.emplace([task]() { (*task)(); });
+    tasks_.emplace(task);
   }
   condition_.notify_one();
-  return res;
 }
 
 thread_pool::~thread_pool() {

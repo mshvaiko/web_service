@@ -7,14 +7,14 @@
 #include <unistd.h>
 
 #include <cstring>
+#include <functional>
 #include <iostream>
-
 #include <sstream>
 
 namespace server {
 
-web_server::web_server(const std::string &address_, int port_)
-    : address(address_), port(port_) {}
+web_server::web_server(const std::string &address_, int port_, size_t threads_)
+    : address(address_), port(port_), t_pool(threads_) {}
 
 bool web_server::init() {
   sockaddr_in addr;
@@ -52,18 +52,6 @@ bool web_server::init() {
 }
 
 void web_server::run() {
-  char buf[1024];
-
-  std::stringstream wsss;
-  std::string resp =
-      "<html><body><center><h1>Hello World!</h1></center></body></html>";
-  wsss << "HTTP/1.1 200 OK\r\n"
-       << "Connection: keep-alive\r\n"
-       << "Content-Type: text/html; charset=utf-8\r\n"
-       << "Content-Length: " << resp.length() << "\r\n"
-       << "\r\n";
-  wsss.write(resp.data(), resp.length());
-
   while (true) {
     sockaddr_in client;
     socklen_t client_len = sizeof(client);
@@ -71,11 +59,28 @@ void web_server::run() {
         accept(sock_fd, reinterpret_cast<sockaddr *>(&client), &client_len);
     std::cout << "Client with" << inet_ntoa(client.sin_addr) << " connected"
               << std::endl;
-    int read = recv(client_fd, buf, 1024, 0);
 
-    std::cout << buf << std::endl;
-    send(client_fd, wsss.str().data(), wsss.str().length(), 0);
-    close(client_fd);
+    t_pool.enqueue([&] { clientHandler(client_fd); });
   }
 }
+
+void web_server::clientHandler(int client_fd) {
+  char buf[1024];
+
+  std::stringstream wsss;
+  std::string resp =
+      "<html><body><center><h1>Hello World!</h1></center></body></html>";
+  wsss << "HTTP/1.1 200 OK\r\n"
+       << "Content-Type: text/html; charset=utf-8\r\n"
+       << "Content-Length: " << resp.length() << "\r\n"
+       << "\r\n";
+  wsss.write(resp.data(), resp.length());
+
+  int read = recv(client_fd, buf, 1024, 0);
+
+  send(client_fd, wsss.str().data(), wsss.str().length(), 0);
+
+  close(client_fd);
+}
+
 } // namespace server

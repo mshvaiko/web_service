@@ -21,19 +21,17 @@ private:
   // synchronization
   std::mutex queue_mutex_;
   std::condition_variable condition_;
-  std::atomic_bool stop_;
+  bool stop_;
 
 public:
-  explicit thread_pool(size_t);
+  explicit thread_pool(size_t pool_size);
   ~thread_pool();
 
   // this object shouldn't be copied
   thread_pool(const thread_pool &) = delete;
   thread_pool &operator=(const thread_pool &) = delete;
 
-  template <typename F, typename... Args>
-  auto enqueue(F &&f, Args &&... args)
-      -> std::future<typename std::result_of<F(Args...)>::type>;
+  void enqueue(std::function<void()> task);
 };
 
 } // namespace server
